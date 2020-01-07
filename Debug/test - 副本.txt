@@ -1,0 +1,17 @@
+variable:b=1;
+input:n();
+b:=1;
+c:1,color0011ff,linethick1;
+a:=a+b*c/2+1-5;
+if a > 1 then
+begin
+c:1;
+b:=1;
+end
+else
+c:=2;
+for i = 0 downto 10 do
+b:=1;
+while a+b 
+do
+c:2;
