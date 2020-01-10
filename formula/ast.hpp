@@ -7,23 +7,13 @@
 #include <vector>
 using namespace std;
 
-#include "boost/variant.hpp"
-#include "boost/optional.hpp"
+#include <boost/spirit/include/qi.hpp>
+#include <boost/variant.hpp>
+#include <boost/optional.hpp>
 
 namespace ast {
-	struct Nil {};
-
-	struct Literal {
-		Literal(const string& name=""):name(name){}
-		uint32_t	id;
-		string		name;
-	};
-
+	struct Nil {};	
 	
-	struct FunctionCall;
-	struct Expression;
-
-
 	typedef boost::variant<	Nil
 		, double
 		, string
@@ -51,28 +41,35 @@ namespace ast {
 	>
 		ModiferStmtOperand;
 
-
+	struct ModiferStmtOperandList :list<ModiferStmtOperand> {};
 	//输入语句
 	struct InputStmt {
 		string name;
-		vector<double> params;
+		list<double> params;
 	};
+	struct InputStmtList :list<InputStmt> {};
 
 	//定义变量
 	struct VariableStmt {
 		string name;
-		vector<BaseOperand> operands;
+		list<BaseOperand> operands;
 	};
+	struct VariableStmtList : list<VariableStmt> {};
 
 	struct Unary;
-	struct Operation;
+	struct Operation; 	
 	struct Expression;
 	struct FunctionCall;
+	//quote
+	struct QuoteString : string {
+
+	};
+
 	//表达式
 	typedef boost::variant<Nil
-		, char
 		, double
 		, string
+		, QuoteString
 		, uint32_t
 		, SFI
 		, boost::recursive_wrapper<Unary>
@@ -97,64 +94,80 @@ namespace ast {
 	struct Expression
 	{
 		CalcOperand first;
-		std::list<CalcOperand> operationLst;
+		list<Operation> operationLst;
 	};
+	struct ExpressionList :list<Expression> {};
 
+	
+
+	//函数调用
 	struct FunctionCall
 	{
 		string name;
-// 		boost::optional<list<Expression>> args;
+ 		list<Expression> args;
+	};	
+	//赋值或者输出
+	struct Assignment
+	{
+		string type;
+		string lhs;
+		Expression rhs;
 	};
 
+	struct Out:Assignment{
+		boost::optional<ast::ModiferStmtOperandList> modifer;
+	};
+
+	struct IfStatement;
+	struct WhileStatement;
+	struct ForStatement;
+	struct StatementList;
+	
+	typedef boost::variant<Nil
+		, boost::recursive_wrapper<InputStmtList>
+		, boost::recursive_wrapper<VariableStmtList>
+		, boost::recursive_wrapper<Out>
+		, boost::recursive_wrapper<IfStatement>
+		, boost::recursive_wrapper<WhileStatement>
+		, boost::recursive_wrapper<ForStatement>
+		, boost::recursive_wrapper<StatementList>
+	>
+		Statement;
+
+	struct StatementList : list<Statement> {};
+
+
+
+	struct IfStatement
+	{
+		Expression condition;
+		Statement thenStmt;
+		boost::optional<Statement> elseStmt;
+	};
+
+	struct WhileStatement
+	{
+		Expression condition;
+		Statement body;
+	};	
+
+	struct ForStatement {
+		string id;
+		Expression start;
+		Expression end;
+		Statement body;
+		string type;
+	};
 	
 
-// 	struct Assignment
-// 	{
-// 		Literal lhs;
-// 		Expression rhs;
-// 	};
-// 
-// 	struct VariableDeclaration
-// 	{
-// 		Literal lhs;
-// 		boost::optional<Expression> rhs;
-// 	};
-// 
-// 	struct IfStatement;
-// 	struct WhileStatement;
-// 	struct StatementList;
-// 	struct CompoundStatement;
-// 	
-// 
-// 	typedef boost::variant<
-// 		VariableDeclaration
-// 		, Assignment
-// 		, boost::recursive_wrapper<IfStatement>
-// 		, boost::recursive_wrapper<WhileStatement>
-// 		, boost::recursive_wrapper<StatementList>
-// 	>
-// 		Statement;
-// 
-// 	struct StatementList : std::list<Statement> {};
-// 
-// 	struct IfStatement
-// 	{
-// 		Expression condition;
-// 		Statement then;
-// 		boost::optional<Statement> else_;
-// 	};
-// 
-// 	struct WhileStatement
-// 	{
-// 		Expression condition;
-// 		Statement body;
-// 	};	
-// 
-// 	struct CompoundStatement {
-// 		StatementList body;
-// 	};
+	typedef boost::variant<Nil
+		, boost::recursive_wrapper<IfStatement>
+		, boost::recursive_wrapper<WhileStatement>
+		, boost::recursive_wrapper<ForStatement>
+		, boost::recursive_wrapper<StatementList>
+	>
+		ComplexStatement;
 
-	
 }
 
 BOOST_FUSION_ADAPT_STRUCT(
@@ -201,7 +214,45 @@ BOOST_FUSION_ADAPT_STRUCT(
 BOOST_FUSION_ADAPT_STRUCT(
 	ast::FunctionCall,
 	(auto, name)
-// 	(auto, args)
+ 	(auto, args)
+)
+// 
+// BOOST_FUSION_ADAPT_STRUCT(
+// 	ast::Assignment,	
+// 	(auto, type)
+// 	(auto, lhs)
+// 	(auto, rhs)
+// 
+// )
+
+BOOST_FUSION_ADAPT_STRUCT(
+	ast::Out,	
+	(auto, type)
+	(auto, lhs)
+	(auto, rhs)
+	(auto, modifer)
+)
+
+BOOST_FUSION_ADAPT_STRUCT(
+	ast::IfStatement,
+	(auto, condition)
+	(auto, thenStmt)
+	(auto, elseStmt)
+)
+
+BOOST_FUSION_ADAPT_STRUCT(
+	ast::WhileStatement,
+	(auto, condition)
+	(auto, body)
+)
+
+BOOST_FUSION_ADAPT_STRUCT(
+	ast::ForStatement,
+	(auto, id)
+	(auto, start)
+	(auto, end)
+	(auto, body)
+	(auto, type)
 )
 
 

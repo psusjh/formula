@@ -88,3 +88,5 @@ struct InstructionSymbol {
 	uint8_t	numParam;
 	uint32_t* literalPos;
 };
+
+

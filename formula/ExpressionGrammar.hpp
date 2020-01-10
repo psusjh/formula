@@ -8,7 +8,7 @@ using namespace std;
 #include "ModifierSymbols.h"
 
 #include "SkipperGrammar.hpp"
-#include "CodeCompiler.h"
+#include "Code.h"
 #include "ast.hpp"
 
 template<typename Iterator>
@@ -56,11 +56,11 @@ public:
 		wordRule %= lexeme[(char_("a-zA-Z\x80-\xff_")) >> *(char_("a-zA-Z0-9\x80-\xff_"))];
 		identifierRule %= !(lexeme[no_case[keyWordsSymbols]] | lexeme[no_case[indicatorSymbols]]) >> wordRule;
 
- 		argumentExpr = -(expr% ',');
+ 		argumentExpr = -(expr % ',');
 
 		functionExpr =
-			indicatorSymbols > -('(' > argumentExpr > ')')
-			| indicatorSymbols
+			indicatorSymbols >> -('(' > argumentExpr > ')')
+			/*| indicatorSymbols*/
 			;
 
 		stringRule %= char_('\'') >> *(lit("\\\'") | char_ - char_("\'")) >> char_('\'');
@@ -72,7 +72,7 @@ public:
 			| stringRule
  			| quoteRule
  			| identifierRule
- 			| functionExpr
+  			| functionExpr
  			| '(' > expr > ')'
 			;
 	}
@@ -96,7 +96,9 @@ public:
 protected:
 	qi::rule<Iterator, ast::Expression(), ascii::space_type> expr;
 
-	qi::rule<Iterator, string(), ascii::space_type> wordRule, quoteRule;
+	qi::rule<Iterator, string(), ascii::space_type> wordRule;
+
+	qi::rule<Iterator, ast::QuoteString(), ascii::space_type> quoteRule;
 
 	qi::rule<Iterator, ast::CalcOperand(), ascii::space_type> unaryExpr, mainExpr;
 	qi::rule<Iterator, ast::Expression(), ascii::space_type> multiExpr, additiveExpr, relationalExpr, equalityExpr;
@@ -104,7 +106,7 @@ protected:
 	qi::rule<Iterator, ast::Expression(), ascii::space_type> logicalAndExpr, logicalOrExpr;
 
 	qi::rule<Iterator, ast::FunctionCall(), ascii::space_type> functionExpr;
-	qi::rule<Iterator, vector<ast::Expression>(), ascii::space_type> argumentExpr;
+	qi::rule<Iterator, ast::ExpressionList(), ascii::space_type> argumentExpr;
 
 
 	qi::symbols<char>			keyWordsSymbols;

@@ -1,1 +1,2 @@
-ma
+b:=2;
+a:1,colorred,linethick1;
