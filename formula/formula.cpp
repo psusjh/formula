@@ -22,8 +22,8 @@ namespace ascii = boost::spirit::ascii;
 #include "ExpressionGrammar.hpp"
 #include "ErrorGrammarHandler.hpp"
 
-// #include "compiler.h"
-// #include "Code.h"
+#include "compiler.h"
+#include "Code.h"
 
 string mainPath;
 
@@ -79,21 +79,18 @@ main(int argc, char* argv[])
 
 			if (info && iter == end)
 			{
-// 				compiler compiler_(make_shared<Code>());
-// 
-// 				for (auto e : astResult) {
-// // 					compiler_(e);
-// 					e.apply_visitor(compiler_);
-// 					cout << "\n";
-// 					
-// 					
-// 				}
+ 				
 // 				compiler_(astResult);
 //				astResult.apply_visitor(compiler_);
 
 				cout << "-------------------------\n";
 				cout << "Parsing succeeded\n";
 				cout << "-------------------------\n";
+				compiler compiler_(make_shared<Code>());
+				for (auto e : astResult) {
+					e.apply_visitor(compiler_);
+				}
+				compiler_.printCode();
 			}
 			else
 			{

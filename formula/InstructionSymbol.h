@@ -1,10 +1,15 @@
 #pragma once
 #include <cstdint>
 #include <algorithm>
+#include <memory>
+using namespace std;
 
-#define LITERAL_TYPE_CONST	0x1
-#define LITERAL_TYPE_STR	0x2
-#define LITERAL_TYPE_VAR	0x3
+#pragma pack(push, 1)
+enum LiteralType {
+	LITERAL_TYPE_CONST,
+	LITERAL_TYPE_STR,
+	LITERAL_TYPE_VAR
+};
 
 struct LiteralVar 
 {
@@ -30,7 +35,9 @@ struct Literal {
 	Literal(const char* name, uint32_t len, double* values) {
 		memset(&literalValue.var, 0, sizeof(LiteralVar));
 		literalType = LITERAL_TYPE_VAR;
-		memcpy(literalValue.var.name, name, std::min((int)strlen(name), 32));
+		if (name) {
+			memcpy(literalValue.var.name, name, std::min((int)strlen(name), 32));
+		}
 		literalValue.var.len = len;
 		if (len) {
 			literalValue.var.values = new double[len];
@@ -67,10 +74,8 @@ struct Literal {
 		}
 		return false;
 	}
-
-
 	
-	uint8_t literalType;
+	LiteralType literalType;
 	union 
 	{
 		LiteralVar var;
@@ -87,6 +92,15 @@ struct InstructionSymbol {
 	uint16_t id;
 	uint8_t	numParam;
 	uint32_t* literalPos;
+	uint32_t resultPos;
+	virtual ~InstructionSymbol() {
+		if (literalPos) {
+			delete[]literalPos;
+		}
+	}
 };
 
+typedef shared_ptr<InstructionSymbol> InstructionSymbolPtr;
+
+#pragma pack(pop)
 

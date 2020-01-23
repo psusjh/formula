@@ -1,2 +1,2 @@
-b:=2;
-a:1,colorred,linethick1;
+a:(2+3)*2;
+{a:1,colorred,linethick1;}
