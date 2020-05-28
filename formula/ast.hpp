@@ -6,7 +6,7 @@
 #include <list>
 #include <vector>
 using namespace std;
-
+#include <boost/config/warning_disable.hpp>
 #include <boost/spirit/include/qi.hpp>
 #include <boost/variant.hpp>
 #include <boost/optional.hpp>
@@ -45,14 +45,14 @@ namespace ast {
 	//输入语句
 	struct InputStmt {
 		string name;
-		list<double> params;
+		vector<double> params;
 	};
 	struct InputStmtList :list<InputStmt> {};
 
 	//定义变量
 	struct VariableStmt {
 		string name;
-		list<BaseOperand> operands;
+		BaseOperand operands;
 	};
 	struct VariableStmtList : list<VariableStmt> {};
 
@@ -65,11 +65,16 @@ namespace ast {
 
 	};
 
+	struct Iditenfier : string {
+
+	};
+
 	//表达式
 	typedef boost::variant<Nil
 		, double
 		, string
 		, QuoteString
+		, Iditenfier
 		, uint32_t
 		, SFI
 		, boost::recursive_wrapper<Unary>
@@ -103,13 +108,17 @@ namespace ast {
 	//函数调用
 	struct FunctionCall
 	{
-		string name;
+		SFI id;
  		list<Expression> args;
 	};	
 	//赋值或者输出
+	enum StatementType{
+		assignment,
+		out
+	};
 	struct Assignment
 	{
-		string type;
+		StatementType type;
 		string lhs;
 		Expression rhs;
 	};
@@ -122,6 +131,7 @@ namespace ast {
 	struct WhileStatement;
 	struct ForStatement;
 	struct StatementList;
+	struct CompoundStatement;
 	
 	typedef boost::variant<Nil
 		, boost::recursive_wrapper<InputStmtList>
@@ -131,13 +141,19 @@ namespace ast {
 		, boost::recursive_wrapper<WhileStatement>
 		, boost::recursive_wrapper<ForStatement>
 		, boost::recursive_wrapper<StatementList>
+		, boost::recursive_wrapper<CompoundStatement>
 	>
 		Statement;
 
 	struct StatementList : list<Statement> {};
 
+	struct CompoundStatement : list<Statement> {};
 
 
+	struct ThenStatement {
+		Statement thenStmt;
+		boost::optional<Statement> elseStmt;
+	};
 	struct IfStatement
 	{
 		Expression condition;
@@ -150,13 +166,16 @@ namespace ast {
 		Expression condition;
 		Statement body;
 	};	
-
+	enum ForType {
+		TYPE_TO,
+		TYPE_DOWN
+	};
 	struct ForStatement {
 		string id;
 		Expression start;
 		Expression end;
 		Statement body;
-		string type;
+		ForType type;
 	};
 	
 
@@ -165,6 +184,7 @@ namespace ast {
 		, boost::recursive_wrapper<WhileStatement>
 		, boost::recursive_wrapper<ForStatement>
 		, boost::recursive_wrapper<StatementList>
+		, boost::recursive_wrapper<CompoundStatement>
 	>
 		ComplexStatement;
 
@@ -213,7 +233,7 @@ BOOST_FUSION_ADAPT_STRUCT(
 
 BOOST_FUSION_ADAPT_STRUCT(
 	ast::FunctionCall,
-	(auto, name)
+	(auto, id)
  	(auto, args)
 )
 // 
@@ -231,6 +251,12 @@ BOOST_FUSION_ADAPT_STRUCT(
 	(auto, lhs)
 	(auto, rhs)
 	(auto, modifer)
+)
+
+BOOST_FUSION_ADAPT_STRUCT(
+	ast::ThenStatement,
+	(auto, thenStmt)
+	(auto, elseStmt)
 )
 
 BOOST_FUSION_ADAPT_STRUCT(

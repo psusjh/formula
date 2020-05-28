@@ -14,10 +14,10 @@ struct compiler :boost::static_visitor<>
 {
 
 private:
-	compiler(shared_ptr<ofstream>& log,shared_ptr<Code>&code, int depth);
+	compiler(shared_ptr<ofstream>& log, shared_ptr<Code>&code, int depth);
 	ostream& getOut();
 public:
-	compiler(shared_ptr<Code>& code);
+	compiler(const shared_ptr<Code>& code);
 	virtual ~compiler();
 
 	void operator()(ast::Nil);
@@ -29,6 +29,8 @@ public:
 
 	void operator()(ast::QuoteString& x);
 
+	void operator()(const ast::Iditenfier& x);
+
 	void operator()(const string& x);
 
 	void operator()(ast::Expression const& expression);
@@ -38,6 +40,8 @@ public:
 	void operator()(ast::WhileStatement const& whileStatement);
 
 	void operator()(ast::IfStatement const& ifStatement);
+
+	void operator()(ast::CompoundStatement const& compoundStatement);
 
 	void operator()(ast::StatementList const& statements);
 

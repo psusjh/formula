@@ -24,7 +24,7 @@ namespace ascii = boost::spirit::ascii;
 
 #include "compiler.h"
 #include "Code.h"
-
+#include "InternalFunction.h"
 string mainPath;
 
 
@@ -32,6 +32,7 @@ string mainPath;
 int
 main(int argc, char* argv[])
 {
+	int i = 1 + -1;
 	std::cout << "/////////////////////////////////////////////////////////\n\n";
 	std::cout << "\t\tformula Parser\n\n";
 	std::cout << "/////////////////////////////////////////////////////////\n\n";
@@ -43,11 +44,12 @@ main(int argc, char* argv[])
 			break;
 		}
 	}
-
+	InternalFunction::initCatalog();
+	InternalFunction::initInternalFunction();
 	
 
 	auto parseFormula = [](const string& text) {
-		try {
+		//try {
 
 
 			//client::Formular<string::const_iterator> program;
@@ -70,12 +72,12 @@ main(int argc, char* argv[])
  			ast::StatementList astResult;
 //			string astResult;
 			
-// 			SkipperGrammar<string::const_iterator> skipper;
+ 			SkipperGrammar<string::const_iterator> skipper;
 
 			
- 			ascii::space_type space;
+//  			ascii::space_type skipper;
 
-			bool info = qi::phrase_parse(iter, end, program, space, astResult);
+			bool info = qi::phrase_parse(iter, end, program, skipper, astResult);
 
 			if (info && iter == end)
 			{
@@ -97,13 +99,13 @@ main(int argc, char* argv[])
 
 				cout << "-------------------------\n";
 				cout << "Parsing failed ret: " << info << "\n";
-				cout << "stopped at: \": " << string(iter, end) << "\"\n";
+				cout << "stopped at: \"" << string(iter, end) << "\"\n";
 				cout << "-------------------------\n";
 			}
-		}
-		catch (std::exception& e) {
-			cout << "std::exception:" << e.what() << endl;
-		}
+// 		}
+// 		catch (std::exception& e) {
+// 			cout << "std::exception:" << e.what() << endl;
+// 		}
 	};
 	
 	string a = "\x80-\xff";

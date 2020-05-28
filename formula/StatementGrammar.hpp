@@ -13,12 +13,13 @@
 
 
 template<typename Iterator>
-class StatementGrammar : public qi::grammar<Iterator, ast::StatementList(), ascii::space_type>
+class StatementGrammar : public qi::grammar<Iterator, ast::StatementList(), SkipperGrammar<Iterator>>
 {
-	typedef qi::rule<Iterator,  ascii::space_type> Rule;	
+	typedef qi::rule<Iterator,  SkipperGrammar<Iterator>> Rule;	
 public:
 	StatementGrammar(ErrorGrammarHandler<Iterator>& errorHandler)
 		:StatementGrammar::base_type(statementListRule, "StatementGrammar")
+		, expressionGrammar(errorHandler)
 	{
 		using boost::phoenix::function;
 
@@ -36,19 +37,21 @@ public:
 		using qi::eol;
 		using qi::eoi;
 		using qi::lit;
-
+		using qi::alnum;
+		using qi::eps;
 		using qi::on_error;
 		using qi::as_string;
 		using qi::no_case;
 		using qi::repeat;
 		using qi::lexeme;
+		using qi::raw;
 		using boost::phoenix::at_c;
 		using boost::phoenix::push_back;
+		using qi::matches;
 
 
-		expressionGrammar.addIndicator("ma");
-		expressionGrammar.addIndicator("macd");
-		expressionGrammar.addIndicator("kdj");
+		
+		
 
 		
 		colorModifer %= lexeme[
@@ -76,7 +79,7 @@ public:
 
 		modiferList %= -(modiferStmt % char_(','));
 
-		inputParamList %= -(double_ % char_(','));
+		inputParamList %= +(double_ % char_(','));
  		inputSubStmt %= expressionGrammar.identifierRule >> '(' >> inputParamList >> ')';
  		inputStmtRule %= no_case["input:"] >> -(inputSubStmt % char_(',')) >> ';';
 
@@ -84,52 +87,91 @@ public:
 		variableStmtRule = no_case["variable:"] >> -(variableSubStmt % ',') >> ';';
 
 		out = expressionGrammar.identifierRule[at_c<1>(_val) = _1] >(
-			(lit(":=")[at_c<0>(_val) = "a"] > expressionGrammar[at_c<2>(_val) = _1] >> ';')
-			|(lit(":")[at_c<0>(_val) = "o"] > expressionGrammar[at_c<2>(_val) = _1] > -(',' > modiferList)[at_c<3>(_val) = _1] >> ';')
+			(lit(":=")[at_c<0>(_val) = ast::StatementType::assignment] > expressionGrammar[at_c<2>(_val) = _1] >> ';')
+			|(lit(":")[at_c<0>(_val) = ast::StatementType::out] > expressionGrammar[at_c<2>(_val) = _1] > -(',' > modiferList)[at_c<3>(_val) = _1] >> ';')
 			)
 			;
 
 		
-		thenRule = no_case["then"] > statementRule;
-		ifPartRule = thenRule > -(no_case["else"] > statementRule);
-		ifStmlRule = no_case["if"] > expressionGrammar > ifPartRule;
+// 		thenRule = no_case["then"] > statementRule;
+// 		ifPartRule = (thenRule) > -(no_case["else"] > statementRule);
+		ifKey = no_case["if"];
+		elseKey = no_case["else"];
+		thenKey = no_case["then"];
 
- 		whileStmlRule = no_case["while"] > expressionGrammar > no_case["do"] > statementRule;
+		ifStmlRule = ifKey
+					> expressionGrammar
+					> thenKey
+					> statementRule
+					> -(elseKey > statementRule);
+
+		whileKey = no_case["while"];
+		doKey = no_case["do"];
+		forKey = no_case["for"];
+		toKey = no_case["to"];
+		downToKey = no_case["downto"];
+
+ 		whileStmlRule = whileKey > expressionGrammar > doKey > statementRule;
  
-		forStmlRule = no_case["for"]
+		forStmlRule = forKey
 				> expressionGrammar.identifierRule[at_c<0>(_val) = _1]
 				> '='
 				> expressionGrammar[at_c<1>(_val) = _1]
-				> (no_case["downto"][at_c<4>(_val) = "d"] | no_case["to"][at_c<4>(_val) = "t"])
+				> (downToKey[at_c<4>(_val) = ast::ForType::TYPE_DOWN] | toKey[at_c<4>(_val) = ast::ForType::TYPE_TO])
 				> expressionGrammar[at_c<2>(_val) = _1]
-				> no_case["do"]
+				> doKey
 				> statementRule[at_c<3>(_val) = _1]
 			;
+		begin = no_case["begin"];
+		end = no_case["end"];
+ 		compoundStmtRule = begin > -statementListRule  > end ;
 
- 		compoundStmtRule = no_case["begin"] > statementListRule > no_case["end"];
-
-		complexStmtRule = ifStmlRule
+		complexStmtRule = 
+			compoundStmtRule
+			| ifStmlRule
  			| whileStmlRule
  			| forStmlRule
- 			| compoundStmtRule
 			;
 
 		statementRule =
-			commentGrammar	
- 			| inputStmtRule
+				
+ 			 inputStmtRule
 			| variableStmtRule	
+			| complexStmtRule
 			| out
 // 			| assignment 
-			| complexStmtRule
+			
 			| no_case["break"] > ";"
 			| lit(";")
-			| eol
+ 			| eol
+// 			| commentGrammar
 			;
 
-		statementListRule = +statementRule;
+		statementListRule = +(statementRule - end);
 
 
 		
+// 		on_error<qi::fail>(expressionGrammar.identifierRule,
+// 			FunctionErrorGrammarHandler(errorHandler)(
+// 				"Error! Expecting ", _4, _3));
+		statementListRule.name("statementListRule");
+		out.name("out");
+		statementRule.name("statementRule");
+		compoundStmtRule.name("compoundStmtRule");
+		ifStmlRule.name("ifStmlRule");
+		
+		ifKey.name("if");
+		thenKey.name("then");
+		elseKey.name("else");
+		begin.name("begin");
+		end.name("end");
+		doKey.name("do");
+		downToKey.name("downto");
+		toKey.name("to");
+		whileKey.name("while");
+		forKey.name("for");
+
+
 		on_error<qi::fail>(statementListRule,
 			FunctionErrorGrammarHandler(errorHandler)(
 				"Error! Expecting ", _4, _3));
@@ -146,43 +188,45 @@ protected:
 
 	
 	Rule start;
-	qi::rule<Iterator, ast::Statement(), ascii::space_type> statementRule;
-	qi::rule<Iterator, ast::StatementList(), ascii::space_type> statementListRule;
+	Rule ifKey, thenKey, elseKey, begin, end, doKey, downToKey, toKey, whileKey, forKey;
+	qi::rule<Iterator, ast::Statement(), SkipperGrammar<Iterator>> statementRule;
+	qi::rule<Iterator, ast::StatementList(), SkipperGrammar<Iterator>> statementListRule;
 	//input ”Ôæ‰
-	qi::rule<Iterator, list<double>(), ascii::space_type> inputParamList;
-	qi::rule<Iterator, ast::InputStmt(), ascii::space_type> inputSubStmt;
-	qi::rule<Iterator, ast::InputStmtList(), ascii::space_type> inputStmtRule;
+	qi::rule<Iterator, list<double>(), SkipperGrammar<Iterator>> inputParamList;
+	qi::rule<Iterator, ast::InputStmt(), SkipperGrammar<Iterator>> inputSubStmt;
+	qi::rule<Iterator, ast::InputStmtList(), SkipperGrammar<Iterator>> inputStmtRule;
 	//Rule inputStmtRule, inputParamList, inputSubStmt;
 	//variable ”Ôæ‰
-	qi::rule<Iterator, ast::VariableStmt(), ascii::space_type> variableSubStmt;
-	qi::rule<Iterator, ast::VariableStmtList(), ascii::space_type> variableStmtRule;
+	qi::rule<Iterator, ast::VariableStmt(), SkipperGrammar<Iterator>> variableSubStmt;
+	qi::rule<Iterator, ast::VariableStmtList(), SkipperGrammar<Iterator>> variableStmtRule;
 	//Rule variableStmtRule, variableSubStmt;
 	//∏≥÷µ”Ôæ‰∫Õ ‰≥ˆ”Ôæ‰
-// 	qi::rule<Iterator, ast::Assignment(), ascii::space_type> assignment;
-	qi::rule<Iterator, ast::Out(), ascii::space_type> out;
+// 	qi::rule<Iterator, ast::Assignment(), SkipperGrammar<Iterator>> assignment;
+	qi::rule<Iterator, ast::Out(), SkipperGrammar<Iterator>> out;
 	//Rule assignmentAndOutRule;
 
 	
 	
 	
-	qi::rule<Iterator, ast::ColorModifer(), ascii::space_type> colorModifer;
-	qi::rule<Iterator, ast::TypeModifer(), ascii::space_type> thickModifer, layerModifer, preciseModifer;
-	qi::rule<Iterator, ast::TypeModifer(), ascii::space_type> alignModifer,valignModifer, lineModifer, moveModifer;
-	qi::rule<Iterator, ast::ModiferStmtOperand(), ascii::space_type> modiferStmt;
-	qi::rule<Iterator, ast::ModiferStmtOperandList(), ascii::space_type> modiferList;
+	qi::rule<Iterator, ast::ColorModifer(), SkipperGrammar<Iterator>> colorModifer;
+	qi::rule<Iterator, ast::TypeModifer(), SkipperGrammar<Iterator>> thickModifer, layerModifer, preciseModifer;
+	qi::rule<Iterator, ast::TypeModifer(), SkipperGrammar<Iterator>> alignModifer,valignModifer, lineModifer, moveModifer;
+	qi::rule<Iterator, ast::ModiferStmtOperand(), SkipperGrammar<Iterator>> modiferStmt;
+	qi::rule<Iterator, ast::ModiferStmtOperandList(), SkipperGrammar<Iterator>> modiferList;
 // 	Rule modiferList, modiferStmt;
 
 // 	Rule forStmlRule, whileStmlRule;
-	qi::rule<Iterator, ast::ForStatement(), ascii::space_type> forStmlRule;
-	qi::rule<Iterator, ast::WhileStatement(), ascii::space_type> whileStmlRule;
+	qi::rule<Iterator, ast::ForStatement(), SkipperGrammar<Iterator>> forStmlRule;
+	qi::rule<Iterator, ast::WhileStatement(), SkipperGrammar<Iterator>> whileStmlRule;
 // 	Rule ifStmlRule, ifPartRule, thenRule;
-	qi::rule<Iterator, ast::Statement(), ascii::space_type> ifPartRule, thenRule;
-	qi::rule<Iterator, ast::IfStatement(), ascii::space_type> ifStmlRule;
+// 	qi::rule<Iterator, ast::Statement(), SkipperGrammar<Iterator>>  thenRule;
+// 	qi::rule<Iterator, ast::ThenStatement(), SkipperGrammar<Iterator>> ifPartRule;
+	qi::rule<Iterator, ast::IfStatement(), SkipperGrammar<Iterator>> ifStmlRule;
 
 	//∏¥∫œ”Ôæ‰
-	qi::rule<Iterator, ast::StatementList(), ascii::space_type> compoundStmtRule;
+	qi::rule<Iterator, ast::CompoundStatement(), SkipperGrammar<Iterator>> compoundStmtRule;
 	//∏¥‘””Ôæ‰
-	qi::rule<Iterator, ast::ComplexStatement(), ascii::space_type> complexStmtRule;
+	qi::rule<Iterator, ast::ComplexStatement(), SkipperGrammar<Iterator>> complexStmtRule;
 
 
 

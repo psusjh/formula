@@ -6,38 +6,83 @@ using namespace std;
 
 #include "OpratorSymbols.h"
 #include "ModifierSymbols.h"
-
+#include "ErrorGrammarHandler.hpp"
 #include "SkipperGrammar.hpp"
 #include "Code.h"
 #include "ast.hpp"
 
+#include <boost/type_traits/is_base_of.hpp>
+#include <boost/mpl/bool.hpp>
+
+
 template<typename Iterator>
-class ExpressionGrammar: public qi::grammar<Iterator, ast::Expression(), ascii::space_type>
+struct Success {
+	template <typename, typename>
+	struct result { typedef void type; };
+	void operator()(ast::CalcOperand& r, Iterator pos)const {
+		if (r.type() == typeid(ast::Nil)) {
+			cout << "Nil\n";
+		}
+		else if (r.type() == typeid(uint32_t)) {
+			cout << "Success\tuint32_t\t";
+			uint32_t index = boost::get<uint32_t>(r);
+			cout << "index:" << index;
+			if (index < sizeof(KeyWord) / sizeof(char*)) {
+				cout << "\tKeyWord:" << KeyWord[index];
+			}
+			cout << endl;
+		}
+		else if (r.type() == typeid(string)) {
+			cout << "Success\tstring:" << boost::get<string>(r) << "\n";
+		}
+		else {
+			cout << "Success\ttype:" << r.type().name() << endl;
+		}
+	}
+	
+};
+
+template<typename Iterator>
+class ExpressionGrammar: public qi::grammar<Iterator, ast::Expression(), SkipperGrammar<Iterator>>
 {
-	typedef qi::rule<Iterator, ascii::space_type> Rule;
+	
+	typedef qi::rule<Iterator, SkipperGrammar<Iterator>> Rule;
 public:
 
-	ExpressionGrammar() :
+	ExpressionGrammar(ErrorGrammarHandler<Iterator>& errorHandler) :
 		ExpressionGrammar::base_type(expr, "ExpressionGrammar")
 	{
+		using boost::phoenix::function;
+
+		typedef function< ErrorGrammarHandler<Iterator> > FunctionErrorGrammarHandler;
+
+		typedef function<Success<Iterator>> FunctionSuccessHandler;
+
 		using qi::char_;
 		using qi::double_;
 		using qi::lexeme;
 		using qi::lit;
-		using qi::_1;
+		using qi::on_error;
+		using qi::on_success;
+		using qi::raw;
+		using qi::alnum;
+		using qi::_val;
+
+		qi::_1_type _1;
+		qi::_2_type _2;
+		qi::_3_type _3;
+		qi::_4_type _4;
 
 		using qi::ascii::no_case;
 
-		addIndicator("ma");
+		addIndicator("c", SFI_C);
+// 		addIndicator("if", SFI_IF);
+		addIndicator("ma", SFI_MA);
 
-		keyWordsSymbols.add("if")("else")("then")
-			("for")("to")("downto")("break")
-			("do")("while")
-			("begin")("end")
-			("and")("or")
-			("varible")
-			("input")
-			;
+		for (size_t i = 0; i < sizeof(KeyWord) / sizeof(char*); ++i) {
+			keyWordsSymbols.add(KeyWord[i], i);
+		}
+		
 	
   		expr = logicalOrExpr.alias();
 		logicalOrExpr = logicalAndExpr >> *(no_case[logicalOrOpSymbols] > logicalAndExpr);
@@ -53,13 +98,16 @@ public:
 			| (unaryOpSymbols > unaryExpr)
 			;
 
-		wordRule %= lexeme[(char_("a-zA-Z\x80-\xff_")) >> *(char_("a-zA-Z0-9\x80-\xff_"))];
-		identifierRule %= !(lexeme[no_case[keyWordsSymbols]] | lexeme[no_case[indicatorSymbols]]) >> wordRule;
+		wordRule = raw[lexeme[(char_("a-zA-Z\x80-\xff_")) >> *(char_("a-zA-Z0-9\x80-\xff_"))]];
+		key = ((lexeme[no_case[indicatorSymbols] | no_case[keyWordsSymbols]]) >> !(alnum | '_'));
+
+		identifierRule = !key
+			>> wordRule;
 
  		argumentExpr = -(expr % ',');
 
 		functionExpr =
-			indicatorSymbols >> -('(' > argumentExpr > ')')
+			no_case[indicatorSymbols] >> -('(' > argumentExpr > ')')
 			/*| indicatorSymbols*/
 			;
 
@@ -75,6 +123,21 @@ public:
   			| functionExpr
  			| '(' > expr > ')'
 			;
+		identifierRule.name("identifierRule");
+		functionExpr.name("functionExpr");
+		wordRule.name("wordRule");
+		mainExpr.name("mainExpr");
+		keyWordsSymbols.name("keyWordsSymbols");
+		indicatorSymbols.name("indicatorSymbols");
+		key.name("key");
+		on_success(key, FunctionSuccessHandler()(_val, _1));
+
+		on_error<qi::fail>(mainExpr,
+			FunctionErrorGrammarHandler(errorHandler)(
+				"Error! Expecting ", _4, _3));
+// 		on_error<qi::fail>(functionExpr,
+// 			FunctionErrorGrammarHandler(errorHandler)(
+// 				"Error! Expecting ", _4, _3));
 	}
 
 	~ExpressionGrammar() {
@@ -84,33 +147,36 @@ public:
 	void addKeyWords(const string& keyWords) {
 		this->keyWordsSymbols.add(keyWords);
 	}
-	void addIndicator(const string& indicator) {
-		this->indicatorSymbols.add(indicator, indicator);		
+	void addIndicator(const string& indicator, SFI sfi) {
+		this->indicatorSymbols.add(indicator, sfi);		
 	}
 	
 	bool hasIndicator(const string& indicator) {
 		return this->indicatorSymbols.find(indicator) != nullptr;
 	}
 public:
-	qi::rule<Iterator, string(), ascii::space_type> identifierRule, stringRule;
+	qi::rule<Iterator, ast::Iditenfier(), SkipperGrammar<Iterator>> identifierRule;
+	qi::rule<Iterator, string(), SkipperGrammar<Iterator>> stringRule;
 protected:
-	qi::rule<Iterator, ast::Expression(), ascii::space_type> expr;
+	qi::rule<Iterator, ast::CalcOperand(), SkipperGrammar<Iterator>> key;
 
-	qi::rule<Iterator, string(), ascii::space_type> wordRule;
+	qi::rule<Iterator, ast::Expression(), SkipperGrammar<Iterator>> expr;
 
-	qi::rule<Iterator, ast::QuoteString(), ascii::space_type> quoteRule;
+	qi::rule<Iterator, string(), SkipperGrammar<Iterator>> wordRule;
 
-	qi::rule<Iterator, ast::CalcOperand(), ascii::space_type> unaryExpr, mainExpr;
-	qi::rule<Iterator, ast::Expression(), ascii::space_type> multiExpr, additiveExpr, relationalExpr, equalityExpr;
-	qi::rule<Iterator, ast::Expression(), ascii::space_type> bitAndExpr, bitXorExpr, bitOrExpr;
-	qi::rule<Iterator, ast::Expression(), ascii::space_type> logicalAndExpr, logicalOrExpr;
+	qi::rule<Iterator, ast::QuoteString(), SkipperGrammar<Iterator>> quoteRule;
 
-	qi::rule<Iterator, ast::FunctionCall(), ascii::space_type> functionExpr;
-	qi::rule<Iterator, ast::ExpressionList(), ascii::space_type> argumentExpr;
+	qi::rule<Iterator, ast::CalcOperand(), SkipperGrammar<Iterator>> unaryExpr, mainExpr;
+	qi::rule<Iterator, ast::Expression(), SkipperGrammar<Iterator>> multiExpr, additiveExpr, relationalExpr, equalityExpr;
+	qi::rule<Iterator, ast::Expression(), SkipperGrammar<Iterator>> bitAndExpr, bitXorExpr, bitOrExpr;
+	qi::rule<Iterator, ast::Expression(), SkipperGrammar<Iterator>> logicalAndExpr, logicalOrExpr;
+
+	qi::rule<Iterator, ast::FunctionCall(), SkipperGrammar<Iterator>> functionExpr;
+	qi::rule<Iterator, ast::ExpressionList(), SkipperGrammar<Iterator>> argumentExpr;
 
 
-	qi::symbols<char>			keyWordsSymbols;
-	qi::symbols<char,string>			indicatorSymbols;
+	qi::symbols<char, uint32_t>			keyWordsSymbols;
+	qi::symbols<char, SFI>				indicatorSymbols;
 	UnaryOpSymbols				unaryOpSymbols;
 	MultiplicativeOpSymbols		multiOpSymbols;
 	AdditiveOpSymbols			additiveOpSymbols;
