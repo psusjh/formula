@@ -71,4 +71,6 @@ private:
 	shared_ptr<ofstream> log;
 	shared_ptr<Code> codeptr;
 	int depth;
+	int curOutResult;
+	uint32_t curCorlor;
 };

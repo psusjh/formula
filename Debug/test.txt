@@ -1,2 +1,23 @@
-a:(2+3)*2;
-{a:1,colorred,linethick1;}
+variable: aa=1,bb=2,cc=3,dd=44;
+input:N(1,2),M(1,2,3,4);
+//fggfhghg
+o1:1,linethick2,layer2;
+o2:2,linethick3,precise3,colorff11d1;
+o3:3,hideval;
+o4:4,colorred;
+cc:=ma(c,N);
+	if aa>3 
+	then
+	begin
+	//	bb:=aa+2;
+		cc:=bb+4;
+		end		
+		else
+		begin
+		cc:=bb+2;
+		begin
+		cc:=1;
+		bb:=2;
+		end
+		end
+

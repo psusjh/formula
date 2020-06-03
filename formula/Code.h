@@ -141,6 +141,31 @@ public:
 	 *	返回指令字符串，用于Debug调试显示
 	 */
 	string getCodeString();
+
+	/**
+	 *	添加Input参数
+	 *	@pos 参数名字在参数表的位置
+	 *	@defaultValue 默认值
+	 *	@minValue	最小值
+	 *	@maxValue	最大值
+	 *	@step	增量步长
+	 */
+	void addInputParam(int pos, double defaultValue, double minValue, double maxValue, double step);
+
+	/**
+	 *	添加输出结果，公式的输出语句
+	 *	@pos 公式输出变量在变量表位置
+	 *	@ret 返回输出结果数组的位置
+	 */
+	int addOutResult(int pos);
+
+	/**
+	 *	设置输出结果的修饰类型
+	 *	@type 类型，color, thick, layer, precise,...,
+	 *	@value 具体的值
+	 */
+	void setOutResultModifer(const string& type, const string& value);
+
 public:
 	static void addOpString(uint32_t sfi, const string& op);
 	static string getOpString(uint32_t sfi);
@@ -153,6 +178,21 @@ private:
 	void deleteBlock(BlockSymbol* block);
 protected:
 	struct ParamInput {
+		/**
+		 *	Input参数定义
+		 *	@p 参数在符号表的位置
+		 *	@d 参数默认值
+		 *	@mn 参数最小值 
+		 *	@mx 参数最大值
+		 *	@s 参数调整步长
+		 */
+		ParamInput(size_t p, double d, double mn, double mx, double s) {
+			this->pos = p;
+			this->defaultValue = d;
+			this->minValue = mn;
+			this->maxValue = mx;
+			this->step = s;
+		}
 		size_t pos;
 		double defaultValue;
 		double minValue;
@@ -160,6 +200,33 @@ protected:
 		double step;
 	};
 	
+	struct OutModifer {	
+		OutModifer() {
+			thick = 1;
+			layer = 0;
+			precise = -1;
+			align = 0;
+			move = 0;
+			hideval = false;
+			color = 0;
+		}
+		char thick;			//线条宽度[0-7]
+		char layer;			//图层[0-7]
+		char precise;		//精度[0-7]
+		char align;			//水平对齐[0-2]
+		char valign;		//垂直对齐[0-2]		
+		char move;			//移动位置[0-9]
+		bool hideval;		//是否显示,默认false, 设置则为true,不显示
+		size_t color;		//颜色
+	};
+	struct Out {
+		size_t pos;			//符号位置
+		bool hasModifer;	//是否存在输出修饰
+		OutModifer modifer;	//修饰
+	};
+	//输出结果数组
+	vector<Out> outResult;
+	vector<ParamInput> inputParamVector;
 	VectorVarTable varTables;				//变量列表
 	BlockSymbol* rootBlock;					//根指令块
 	BlockSymbol* currentBlock;				//当前活动指令块

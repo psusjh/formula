@@ -45,26 +45,50 @@ public:
 		using qi::repeat;
 		using qi::lexeme;
 		using qi::raw;
+		using qi::attr;
 		using boost::phoenix::at_c;
 		using boost::phoenix::push_back;
 		using qi::matches;
 
-
-		
-		
+		commaSign = char_(',');
+		semicolonSign = char_(';');
+		equalSign = char_('=');
+		leftBracket = char_('(');
+		rightBracket = char_(')');
 
 		
 		colorModifer %= lexeme[
 			no_case["color"]
 				>> (no_case[colorSymbols] | repeat(6)[no_case[char_("0-9a-f")]])
 		];
-		thickModifer = lexeme[no_case["linethick"][at_c<0>(_val) = "linethick"] >> char_("0-7")[at_c<1>(_val) += _1]];
-		layerModifer = lexeme[no_case["layer"][at_c<0>(_val) = "layer"] >> char_("0-7")[at_c<1>(_val) += _1]];
-		preciseModifer = lexeme[no_case["precise"][at_c<0>(_val) = "precise"] >> char_("0-7")[at_c<1>(_val) += _1]];
-		alignModifer = lexeme[no_case["align"][at_c<0>(_val) = "align"] >> char_("0-2")[at_c<1>(_val) += _1]];
-		valignModifer = lexeme[no_case["valign"][at_c<0>(_val) = "valign"] >> char_("0-2")[at_c<1>(_val) += _1]];
-		lineModifer = lexeme[no_case["hideval"][at_c<0>(_val) = "hideval"]];
-		moveModifer = lexeme[no_case["move"][at_c<0>(_val) = "move"] >> +char_("0-9")[at_c<1>(_val) += _1]];
+		
+		thickKey = string("linethick");
+		thickNum = char_("0-7");
+		thickModifer = thickKey > thickNum;
+
+		layerKey = string("layer");
+		layerNum = char_("0-7");
+		layerModifer = layerKey > layerNum;
+ 		
+		preciseKey = string("precise");
+		preciseNum = char_("0-7");
+ 		preciseModifer = preciseKey > preciseNum;
+ 		
+		alignKey = string("align");
+		alignNum = char_("0-2");
+ 		alignModifer = alignKey > alignNum;
+
+		valignKey = string("valign");
+		valignNum = char_("0-2");
+ 		valignModifer = valignKey > valignNum;
+
+		hideKey = string("hideval");
+		hideNum = attr("1");
+ 		hideModifer = hideKey > hideNum;
+
+		moveKey = string("move");
+		moveNum = +char_("0-9");
+ 		moveModifer = moveKey > moveNum;
 
 		modiferStmt %= colorModifer
 			| thickModifer
@@ -72,29 +96,28 @@ public:
 			| preciseModifer
 			| alignModifer
 			| valignModifer
-			| lineModifer
+			| hideModifer
 			| moveModifer
 			| lineTypeSymbols
 			;
 
-		modiferList %= -(modiferStmt % char_(','));
+		modiferList %= -(modiferStmt % commaSign);
 
-		inputParamList %= +(double_ % char_(','));
- 		inputSubStmt %= expressionGrammar.identifierRule >> '(' >> inputParamList >> ')';
- 		inputStmtRule %= no_case["input:"] >> -(inputSubStmt % char_(',')) >> ';';
+		inputParamList %= +(double_ % commaSign);
+ 		inputSubStmt %= expressionGrammar.identifierRule > leftBracket >> inputParamList > rightBracket;
+ 		inputStmtRule %= no_case["input:"] >> -(inputSubStmt % commaSign) > semicolonSign;
 
-		variableSubStmt = expressionGrammar.identifierRule >> '=' >> (double_ | expressionGrammar.stringRule);
-		variableStmtRule = no_case["variable:"] >> -(variableSubStmt % ',') >> ';';
+		variableValue = double_ | expressionGrammar.stringRule;
+		variableSubStmt = expressionGrammar.identifierRule > equalSign > variableValue;
+		variableStmtRule = no_case["variable:"] >> -(variableSubStmt % commaSign) > semicolonSign;
 
 		out = expressionGrammar.identifierRule[at_c<1>(_val) = _1] >(
-			(lit(":=")[at_c<0>(_val) = ast::StatementType::assignment] > expressionGrammar[at_c<2>(_val) = _1] >> ';')
-			|(lit(":")[at_c<0>(_val) = ast::StatementType::out] > expressionGrammar[at_c<2>(_val) = _1] > -(',' > modiferList)[at_c<3>(_val) = _1] >> ';')
+			(lit(":=")[at_c<0>(_val) = ast::StatementType::assignment] > expressionGrammar[at_c<2>(_val) = _1] > semicolonSign)
+			|(lit(":")[at_c<0>(_val) = ast::StatementType::out] > expressionGrammar[at_c<2>(_val) = _1] > -(commaSign > modiferList)[at_c<3>(_val) = _1] > semicolonSign)
 			)
 			;
 
 		
-// 		thenRule = no_case["then"] > statementRule;
-// 		ifPartRule = (thenRule) > -(no_case["else"] > statementRule);
 		ifKey = no_case["if"];
 		elseKey = no_case["else"];
 		thenKey = no_case["then"];
@@ -115,16 +138,16 @@ public:
  
 		forStmlRule = forKey
 				> expressionGrammar.identifierRule[at_c<0>(_val) = _1]
-				> '='
+				> equalSign
 				> expressionGrammar[at_c<1>(_val) = _1]
 				> (downToKey[at_c<4>(_val) = ast::ForType::TYPE_DOWN] | toKey[at_c<4>(_val) = ast::ForType::TYPE_TO])
 				> expressionGrammar[at_c<2>(_val) = _1]
 				> doKey
 				> statementRule[at_c<3>(_val) = _1]
 			;
-		begin = no_case["begin"];
-		end = no_case["end"];
- 		compoundStmtRule = begin > -statementListRule  > end ;
+		beginKey = no_case["begin"];
+		endKey = no_case["end"];
+ 		compoundStmtRule = beginKey > -statementListRule  > endKey ;
 
 		complexStmtRule = 
 			compoundStmtRule
@@ -139,15 +162,15 @@ public:
 			| variableStmtRule	
 			| complexStmtRule
 			| out
-// 			| assignment 
+
 			
-			| no_case["break"] > ";"
-			| lit(";")
+			| no_case["break"] > semicolonSign
+			| semicolonSign
  			| eol
 // 			| commentGrammar
 			;
 
-		statementListRule = +(statementRule - end);
+		statementListRule = +(statementRule - endKey);
 
 
 		
@@ -159,19 +182,46 @@ public:
 		statementRule.name("statementRule");
 		compoundStmtRule.name("compoundStmtRule");
 		ifStmlRule.name("ifStmlRule");
-		
+		inputSubStmt.name("input");
+		inputParamList.name("inputList");
 		ifKey.name("if");
 		thenKey.name("then");
 		elseKey.name("else");
-		begin.name("begin");
-		end.name("end");
+		beginKey.name("begin");
+		endKey.name("end");
 		doKey.name("do");
 		downToKey.name("downto");
 		toKey.name("to");
 		whileKey.name("while");
 		forKey.name("for");
+		commaSign.name(",");
+		semicolonSign.name(";");
+		equalSign.name("=");
+		variableValue.name("value");
+		leftBracket.name("(");
+		rightBracket.name(")");
 
+		thickKey.name("thick");
+		thickNum.name("thickNum");
 
+		preciseKey.name("precise");
+		preciseNum.name("preciseNum");
+
+		layerKey.name("layer");
+		layerNum.name("layerNum");
+
+		alignKey.name("align");
+		alignNum.name("alignNum");
+
+		valignNum.name("valign");
+		valignNum.name("valignNum");
+		
+		moveKey.name("move");
+		moveNum.name("moveNum");
+
+// 		on_error<qi::fail>(semicolon,
+// 			FunctionErrorGrammarHandler(errorHandler)(
+// 				"Error! Expecting ", _4, _3));
 		on_error<qi::fail>(statementListRule,
 			FunctionErrorGrammarHandler(errorHandler)(
 				"Error! Expecting ", _4, _3));
@@ -188,7 +238,12 @@ protected:
 
 	
 	Rule start;
-	Rule ifKey, thenKey, elseKey, begin, end, doKey, downToKey, toKey, whileKey, forKey;
+	Rule ifKey, thenKey, elseKey, beginKey, endKey, doKey, downToKey, toKey, whileKey, forKey;
+	Rule commaSign, semicolonSign, equalSign, leftBracket, rightBracket;
+
+	qi::rule<Iterator, string(), SkipperGrammar<Iterator>> thickNum, preciseNum, layerNum, alignNum, valignNum, moveNum, hideNum;
+	qi::rule<Iterator, string(), SkipperGrammar<Iterator>> thickKey, preciseKey, layerKey, alignKey, valignKey, moveKey, hideKey;
+	
 	qi::rule<Iterator, ast::Statement(), SkipperGrammar<Iterator>> statementRule;
 	qi::rule<Iterator, ast::StatementList(), SkipperGrammar<Iterator>> statementListRule;
 	//input Óï¾ä
@@ -197,6 +252,7 @@ protected:
 	qi::rule<Iterator, ast::InputStmtList(), SkipperGrammar<Iterator>> inputStmtRule;
 	//Rule inputStmtRule, inputParamList, inputSubStmt;
 	//variable Óï¾ä
+	qi::rule<Iterator, ast::BaseOperand(), SkipperGrammar<Iterator>> variableValue;
 	qi::rule<Iterator, ast::VariableStmt(), SkipperGrammar<Iterator>> variableSubStmt;
 	qi::rule<Iterator, ast::VariableStmtList(), SkipperGrammar<Iterator>> variableStmtRule;
 	//Rule variableStmtRule, variableSubStmt;
@@ -210,7 +266,7 @@ protected:
 	
 	qi::rule<Iterator, ast::ColorModifer(), SkipperGrammar<Iterator>> colorModifer;
 	qi::rule<Iterator, ast::TypeModifer(), SkipperGrammar<Iterator>> thickModifer, layerModifer, preciseModifer;
-	qi::rule<Iterator, ast::TypeModifer(), SkipperGrammar<Iterator>> alignModifer,valignModifer, lineModifer, moveModifer;
+	qi::rule<Iterator, ast::TypeModifer(), SkipperGrammar<Iterator>> alignModifer,valignModifer, hideModifer, moveModifer;
 	qi::rule<Iterator, ast::ModiferStmtOperand(), SkipperGrammar<Iterator>> modiferStmt;
 	qi::rule<Iterator, ast::ModiferStmtOperandList(), SkipperGrammar<Iterator>> modiferList;
 // 	Rule modiferList, modiferStmt;

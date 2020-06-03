@@ -241,7 +241,6 @@ size_t Code::getTotalSymbolTableSize(BlockSymbol* block)
 std::string Code::getCodeString()
 {
 	stringstream ss;
-
 	auto getLiteralString = [&](size_t pos) {
 		assert(pos >= 0 && pos < varTables.size());
 		if (pos < 0 || pos >= varTables.size()) {
@@ -384,6 +383,51 @@ std::string Code::getCodeString()
 
 	ss << "**************************************\n";
 	return ss.str();
+}
+
+void Code::addInputParam(int pos, double defaultValue, double minValue, double maxValue, double step)
+{
+	inputParamVector.emplace_back(pos, defaultValue, minValue, maxValue, step);
+}
+
+int Code::addOutResult(int pos)
+{
+	Out out;
+	out.pos = pos;
+	out.hasModifer = false;
+	outResult.emplace_back(out);
+	return outResult.size() - 1;
+
+}
+
+void Code::setOutResultModifer(const string& type, const string& value)
+{
+	Out& out = *outResult.rbegin();
+	out.hasModifer = true;
+	if (type.compare("color") == 0) {
+		out.modifer.color = atol(value.c_str());
+	}
+	else if (type.compare("linethick") == 0) {
+		out.modifer.thick = atoi(value.c_str());
+	}
+	else if (type.compare("layer") == 0) {
+		out.modifer.layer = atoi(value.c_str());
+	}
+	else if (type.compare("precise") == 0) {
+		out.modifer.precise = atoi(value.c_str());
+	}
+	else if (type.compare("align") == 0) {
+		out.modifer.align = atoi(value.c_str());
+	}
+	else if (type.compare("valign") == 0) {
+		out.modifer.valign = atoi(value.c_str());
+	}
+	else if (type.compare("hideval") == 0) {
+		out.modifer.hideval = true;
+	}
+	else if (type.compare("move") == 0) {
+		out.modifer.move = atoi(value.c_str());
+	}
 }
 
 size_t Code::addVar(const VarPtr& var)

@@ -17,6 +17,8 @@ compiler::compiler(const shared_ptr<Code>& code)
 {
 	this->codeptr = code;
 	depth = 0;
+	curOutResult = -1;
+	curCorlor = 0;
 	log = make_shared<ofstream>(mainPath+"tree.txt");
 	
 }
@@ -26,6 +28,8 @@ compiler::compiler(shared_ptr<ofstream>& log, shared_ptr<Code>&code, int depth)
 	this->codeptr = code;
 	this->depth = depth;
 	this->log = log;
+	curOutResult = -1;
+	curCorlor = 0;
 }
 
 std::ostream& compiler::getOut()
@@ -52,6 +56,9 @@ void compiler::operator()(ast::TypeModifer const& typeModifer)
 {
 	align_print(getOut(), depth);
 	getOut() << "type:typeModifer:" << typeModifer.type << " value:" << typeModifer.value << "\n";
+	if (curOutResult >= 0) {
+		codeptr->setOutResultModifer(typeModifer.type, typeModifer.value);
+	}
 }
 
 void compiler::operator()(ast::InputStmt const& inputStmt)
@@ -61,8 +68,13 @@ void compiler::operator()(ast::InputStmt const& inputStmt)
 		<< "inputId:" << inputStmt.name
 		<< "params:" << inputStmt.params.size()
 		<< endl;
-	int pos = codeptr->addConst(inputStmt.params[0]);
+	double defaultValue = inputStmt.params.size() ? inputStmt.params[0] : 0;
+	int pos = codeptr->addConst(defaultValue);
 	codeptr->setVarName(pos, inputStmt.name.c_str());
+	double minValue = inputStmt.params.size() > 1 ? inputStmt.params[1] : defaultValue;
+	double maxValue = inputStmt.params.size() > 2 ? inputStmt.params[2] : minValue;
+	double step = inputStmt.params.size() > 3 ? inputStmt.params[3] : 0;
+	codeptr->addInputParam(pos, defaultValue, minValue, maxValue, step);
 }
 
 
@@ -146,7 +158,14 @@ void compiler::operator()(ast::Out const& out)
 	
 	this->operator()(out.rhs);
 	codeptr->addInstruction(out.type == ast::StatementType::assignment? SFI_ASSIGN: SFI_OUT, 1, out.lhs.c_str());
-	codeptr->popStack();
+	int pos = codeptr->popStack();
+	curOutResult = codeptr->addOutResult(pos);
+	if (out.modifer.has_value()) {
+		for (auto modifer : out.modifer.get()) {
+			boost::apply_visitor(*this, modifer);
+		}
+	}
+	curOutResult = -1;
 	
 	getOut() << "out-------\n";
 }
@@ -312,12 +331,21 @@ void compiler::operator()(ast::Expression const& expression)
 void compiler::operator()(const string& x)
 {
 	align_print(getOut(), depth);
+	if (curOutResult >= 0) {
+		curCorlor = 0;
+		for (size_t i = 0; i < x.size(); i += 2) {
+			uint8_t rgb = strtoul(x.substr(i, 2).c_str(), nullptr, 16);
+			curCorlor |= (rgb << 8 * i/2);
+		}
+		codeptr->setOutResultModifer("color", to_string(curCorlor));
+	}
 	getOut() << "type:string depth:" << depth << " value:" << x << endl;
 }
 
 void compiler::operator()(const ast::Iditenfier& x)
 {
 	align_print(getOut(), depth);
+	
 	getOut() << "type:Iditenfier depth:" << depth << " value:" << x << endl;
 	int pos = codeptr->findVar(x.c_str());
 	assert(pos >= 0);
@@ -333,6 +361,10 @@ void compiler::operator()(ast::QuoteString& x)
 void compiler::operator()(uint32_t x)
 {
 	align_print(getOut(), depth);
+	if (curOutResult >= 0) {
+		curCorlor = x;
+		codeptr->setOutResultModifer("color", to_string(curCorlor));
+	}
 	getOut() << "type:uint32_t depth:" << depth << " value:" << x << endl;
 }
 
